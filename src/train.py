@@ -47,7 +47,11 @@ elif config["model"] == "match_pyramid":
     model = MatchPyramid(word_embedder, conv_output_size=[16,16,16,16,16], conv_kernel_size=[[3,3],[3,3],[3,3],[3,3],[3,3]], adaptive_pooling_size=[[36,90],[18,60],[9,30],[6,20],[3,10]])
 
 
-# todo optimizer, loss 
+# todo optimizer, loss
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = nn.Adam(model.parameters())
 
 print('Model',config["model"],'total parameters:', sum(p.numel() for p in model.parameters() if p.requires_grad))
 print('Network:', model)
@@ -67,7 +71,11 @@ for epoch in range(2):
 
     for batch in Tqdm.tqdm(_iterator(_triple_loader.read(config["train_data"]), num_epochs=1)):
         # todo train loop
-        pass
+        optimizer.zero_grad()
+        prob = model.forward(batch[0], batch[1])
+        loss = criterion(prob, batch[2])
+        loss.backwards()
+        optimizer.step()
 
 
 #
