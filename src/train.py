@@ -50,7 +50,7 @@ elif config["model"] == "match_pyramid":
 # todo optimizer, loss
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
-criterion = nn.CrossEntropyLoss()
+criterion = nn.MarginRankingLoss(margin=1, reduction='elementwise_mean')
 optimizer = nn.Adam(model.parameters())
 
 print('Model',config["model"],'total parameters:', sum(p.numel() for p in model.parameters() if p.requires_grad))
@@ -72,8 +72,9 @@ for epoch in range(2):
     for batch in Tqdm.tqdm(_iterator(_triple_loader.read(config["train_data"]), num_epochs=1)):
         # todo train loop
         optimizer.zero_grad()
-        prob = model.forward(batch[0], batch[1])
-        loss = criterion(prob, batch[2])
+        relevance_pos = model.forward(batch[0], batch[1])
+        relevance_neg = model.forward(batch[0], batch[2])
+        loss = criterion(relevance_pos, relevance_neg)
         loss.backwards()
         optimizer.step()
 
