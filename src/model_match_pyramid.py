@@ -7,6 +7,14 @@ import torch.nn.functional as F
 from allennlp.modules.text_field_embedders import TextFieldEmbedder
 from allennlp.modules.matrix_attention.cosine_matrix_attention import CosineMatrixAttention
 
+def block(in_size, out_size, kernel_size, pooling_size):
+    """A standardized convolutional block with a 2d convolution, relu activation and adaptive pooling"""
+    return nn.Sequential(
+        nn.Conv2d(in_size, out_size, kernel_size),
+        nn.ReLU(),
+        nn.AdaptiveMaxPool2d(pooling_size)
+    )
+
 class MatchPyramid(nn.Module):
     '''
     Paper: Text Matching as Image Recognition, Pang et al., AAAI'16
@@ -26,19 +34,17 @@ class MatchPyramid(nn.Module):
             raise Exception("conv_output_size, conv_kernel_size, adaptive_pooling_size must have the same length")
 
         # todo
+        self.min_length = max(conv_kernel_size[0])
         self.matrix_attention = CosineMatrixAttention()
-        self.convs = nn.Sequential(
-            nn.Conv2d(1, 8, 5),
-            nn.ReLU(),
-            nn.AdaptiveMaxPool2d(50),  # dynamic pooling to fixed features
-            nn.Conv2d(8, 16, 3),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
-        )
 
+        conv_input_size = conv_output_size.copy()
+        conv_input_size[0] = 1  # conv in channels are the out channels of the preceding layers (first layer has a single channel as input)
+        self.convs = nn.Sequential(*[block(*params) for params in zip(conv_input_size, conv_output_size , conv_kernel_size, adaptive_pooling_size)])
+
+        out_size = conv_output_size[-1] * adaptive_pooling_size[-1][0] * adaptive_pooling_size[-1][1]  # final output layer can be calculated beforehand thanks to adaptive pooling
         self.mlp = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(16 * 50 * 50, 300),  # fully connected layer to flattened conv output
+            nn.Linear(out_size, 300),  # fully connected layer to flattened conv output
             nn.ReLU(),
             nn.Linear(300, 1)  # outputs a single score value
         )
@@ -60,7 +66,7 @@ class MatchPyramid(nn.Module):
         document_embeddings = self.word_embeddings(document)
 
         # todo
-        match_matrix = self.matrix_attention(query_embeddings, document_embeddings)
+        match_matrix = self.matrix_attention(query_embeddings, document_embeddings)by conv layers
         features = self.convs(match_matrix)
         scores = self.mlp(features)
         output = scores
