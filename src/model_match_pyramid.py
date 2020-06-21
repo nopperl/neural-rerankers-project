@@ -72,7 +72,9 @@ class MatchPyramid(nn.Module):
             query_embeddings = F.pad(query_embeddings, pad=(0, 0, 0, self.min_length - query_len))
         if doc_len < self.min_length:
             doc_embeddings = F.pad(doc_embeddings, pad=(0, 0, 0, self.min_length - doc_len))
-        match_matrix = self.matrix_attention(query_embeddings, document_embeddings)by conv layers
+        match_matrix = self.matrix_attention(query_embeddings, document_embeddings)
+        match_size = match_matrix.size()
+        match_matrix = match_matrix.view(match_size[0], 1, match_size[1], match_size[2])  # reshape tensor to the channel format required by conv layers
         features = self.convs(match_matrix)
         scores = self.mlp(features)
         output = scores
