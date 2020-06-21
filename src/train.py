@@ -85,10 +85,10 @@ def validate(data_file, qrels):
             batch_scores = model.forward(batch['query_tokens'], batch['doc_tokens'])
 
         for i in range(len(batch_scores)):
-            query_id = batch['query_id'][i].item()
+            query_id = str(batch['query_id'][i].item())
             if query_id not in scores:
                 scores[query_id] = []
-            scores[query_id].append((batch['doc_id'][i].item(), batch_scores[i].item()))
+            scores[query_id].append((str(batch['doc_id'][i].item()), batch_scores[i].item()))
 
     ranking = {}
     for query_id in scores:
