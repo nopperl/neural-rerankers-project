@@ -66,6 +66,12 @@ class MatchPyramid(nn.Module):
         document_embeddings = self.word_embeddings(document)
 
         # todo
+        query_len = query_embeddings.size()[1]
+        doc_len = document_embeddings.size()[1]
+        if query_len < self.min_length:  # Pad embeddings if the embedded sequence is smaller than the conv kernel
+            query_embeddings = F.pad(query_embeddings, pad=(0, 0, 0, self.min_length - query_len))
+        if doc_len < self.min_length:
+            doc_embeddings = F.pad(doc_embeddings, pad=(0, 0, 0, self.min_length - doc_len))
         match_matrix = self.matrix_attention(query_embeddings, document_embeddings)by conv layers
         features = self.convs(match_matrix)
         scores = self.mlp(features)
