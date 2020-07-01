@@ -152,6 +152,71 @@ FiRA:
 
 ## Conv-KNRM
 
+The Conv-KNRM model applies 1D CNNs with different window sizes on the query and document embeddings. The resulting h-gram embeddings of the query and the document are then cross matched using the same procedure as in KNRM. A final linear model computes the score using the concatenated cross match kernels.
+
+The 1D convolutional computation was no issue for us, although we were initially unsure whether query and document have separate weights (they do not). For the cross match procedure, we simply copied the KNRM implementation.
+
+The greatest potential for a runtime performance improvement is probably the cross match computation, which iterates through all h-gram combinations and sequentially computes the specific kernel outputs. There may be a way to do this in parallel or at least in a more efficient manner. We tried to optimize it as much as possible, but there might still be possible improvements.
+
+We trained the Conv-KNRM for two epochs over the whole MS-MARCO train dataset, which took on average 55:38 mins per epoch. This makes Conv-KNRM the slowest of all models, which is clearly due to the sequential computation. Unfortunately, due to this long time, we were not able to train the model fully, reaching only an MRR@10 on MS-MARCO and FiRA of 0.20 and 0.93 respectively. The complete results on the test sets are given below.
+
+MS-MARCO:
+```
+{'MRR@10': 0.19505158730158728,
+ 'Recall@10': 0.39995833333333336,
+ 'QueriesWithNoRelevant@10': 1188,
+ 'QueriesWithRelevant@10': 812,
+ 'AverageRankGoldLabel@10': 3.666256157635468,
+ 'MedianRankGoldLabel@10': 3.0,
+ 'MRR@20': 0.20192665926050213,
+ 'Recall@20': 0.49824999999999997,
+ 'QueriesWithNoRelevant@20': 991,
+ 'QueriesWithRelevant@20': 1009,
+ 'AverageRankGoldLabel@20': 5.851337958374629,
+ 'MedianRankGoldLabel@20': 4.0,
+ 'MRR@1000': 0.20553093883520332,
+ 'Recall@1000': 0.6002916666666668,
+ 'QueriesWithNoRelevant@1000': 788,
+ 'QueriesWithRelevant@1000': 1212,
+ 'AverageRankGoldLabel@1000': 9.766501650165017,
+ 'MedianRankGoldLabel@1000': 5.0,
+ 'nDCG@3': 0.17892262546055587,
+ 'nDCG@5': 0.21012103702834278,
+ 'nDCG@10': 0.24226767235717317,
+ 'nDCG@20': 0.2674499135592376,
+ 'nDCG@1000': 0.2885970890570177,
+ 'QueriesRanked': 2000,
+ 'MAP@1000': 0.2029869699517343}
+```
+
+FiRA:
+```
+{'MRR@10': 0.9263565891472869,
+ 'Recall@10': 0.15682592176501056,
+ 'QueriesWithNoRelevant@10': 0,
+ 'QueriesWithRelevant@10': 43,
+ 'AverageRankGoldLabel@10': 1.1627906976744187,
+ 'MedianRankGoldLabel@10': 1.0,
+ 'MRR@20': 0.9263565891472869,
+ 'Recall@20': 0.2422370568194677,
+ 'QueriesWithNoRelevant@20': 0,
+ 'QueriesWithRelevant@20': 43,
+ 'AverageRankGoldLabel@20': 1.1627906976744187,
+ 'MedianRankGoldLabel@20': 1.0,
+ 'MRR@1000': 0.9263565891472869,
+ 'Recall@1000': 0.9434590879921583,
+ 'QueriesWithNoRelevant@1000': 0,
+ 'QueriesWithRelevant@1000': 43,
+ 'AverageRankGoldLabel@1000': 1.1627906976744187,
+ 'MedianRankGoldLabel@1000': 1.0,
+ 'nDCG@3': 0.5671777793002863,
+ 'nDCG@5': 0.5714586851605508,
+ 'nDCG@10': 0.5693508654263322,
+ 'nDCG@20': 0.574296199194637,
+ 'nDCG@1000': 0.8056777798492057,
+ 'QueriesRanked': 43,
+ 'MAP@1000': 0.7105657304955493}
+```
 
 ## Results
 
@@ -159,7 +224,7 @@ FiRA:
 | --- | --- | --- | --- | --- |
 | MatchPyramid | 1,025 | 0.03 | 0.21 | 0.98 |
 | KNRM | 0.822 | 0.04 | 0.22 | 0.97 |
-
+| Conv-KNRM | 1.420 | 0.06 | 0.20  | 0.93  |
 
 
 [1]: https://github.com/AdeDZY/K-NRM
