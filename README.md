@@ -16,15 +16,11 @@ All models were trained on a GPU with early stopping after one epoch of no impro
 
 The MatchPyramid model interprets the match matrix of query and document as image and applies a standard image deep learning pipeline (i.e. convolutional layers).
 Since we did not implement dynamic pooling before, we figured we would have the most problems with this part. As it turns out, however, it is pretty easy to implement these layers in Pytorch.
-We took care to make the architecture fully parameterizable (by the three given parameters). TThe output shape of the convolutional part can be calculated solely by the given parameters.
+We took care to make the architecture fully parameterizable (by the three given parameters). The output shape of the convolutional part can be calculated solely by the given parameters.
 There remains a fixed parameter in the MLP part however: The first fully connected layer outputs 300 units. This number is chosen rather arbitrarily and might not even be necessary. In our experiments it led to a slightly better accuracy at next to no runtime gains.
 We chose the `allennlp.modules.matrix_attention.cosine_matrix_attention.CosineMatrixAttention` to calculate the match matrix.
 
-We trained the MatchPyramid for two epochs over the whole MS-MARCO train dataset, which took 41:19 mins per epoch. The average loss at the end of the training amounted to 0.03. We then computed the MRR@10 over the MS-MARCO and FiRA test datasets and got passable results of around 0.21 and 0.98 respectively. The results are also given in the table below. For completeness, other metrics are also given below.
-
-| Model | Training time | Avg Loss | MS-MARCO MRR@10 | FiRA MRR@10 |
-| --- | --- | --- | --- | --- |
-| MatchPyramid | 1,025 ms/sample | 0.03 | 0.21 | 0.98 |
+We trained the MatchPyramid for two epochs over the whole MS-MARCO train dataset, which took on average 41:19 mins per epoch. The average loss at the end of the training amounted to 0.03. We then computed the MRR@10 over the MS-MARCO and FiRA test datasets and got passable results of around 0.21 and 0.98 respectively. The complete results on the test sets are given below.
 
 MS-MARCO:
 ```
@@ -83,3 +79,88 @@ FiRA:
  'QueriesRanked': 43,
  'MAP@1000': 0.7806980198477049}
 ```
+
+## KNRM
+
+The KNRM model generates a fixed number of bins by applying learnable kernels to the match matrix. The resulting score is calculated using a linear model.
+
+Again, we choose the `allennlp.modules.matrix_attention.cosine_matrix_attention.CosineMatrixAttention` to calculate the match matrix.
+
+The most significant problem we faced were extremely low values when calculating $\log(K_k(M_i))$. This lead to unusable `nan` results. We found out when checking the [original implementation][1] that they solved this by capping low values to 1e-10 and scaling the values by 0.01. This is not described in the [paper][2], however. We fixed the problem in our model likewise.
+
+Another implementation detail is how to compute the OOV mask for the match matrix. We reimplemented the `get_mask()` function of the [original implementation][1] in Pytorch. Since it seems to be only a matrix multiplication, we implemented it using the more efficient `torch.bmm()` instead of nested for loops.
+
+We trained the KNRM for two epochs over the whole MS-MARCO train dataset, which took on average 32:46 mins per epoch. This clearly shows that KNRM is faster than MatchPyramid. The average loss at the end of the training amounted to 0.04. We then computed the MRR@10 over the MS-MARCO and FiRA test datasets and got passable results of around 0.22 and 0.97 respectively. The complete results on the test sets are given below.
+
+MS-MARCO:
+```
+{'MRR@10': 0.22052698412698413,
+ 'Recall@10': 0.4628333333333333,
+ 'QueriesWithNoRelevant@10': 1061,
+ 'QueriesWithRelevant@10': 939,
+ 'AverageRankGoldLabel@10': 3.7380191693290734,
+ 'MedianRankGoldLabel@10': 3.0,
+ 'MRR@20': 0.22665102423376418,
+ 'Recall@20': 0.55125,
+ 'QueriesWithNoRelevant@20': 884,
+ 'QueriesWithRelevant@20': 1116,
+ 'AverageRankGoldLabel@20': 5.514336917562724,
+ 'MedianRankGoldLabel@20': 4.0,
+ 'MRR@1000': 0.22841715720041084,
+ 'Recall@1000': 0.6002916666666668,
+ 'QueriesWithNoRelevant@1000': 788,
+ 'QueriesWithRelevant@1000': 1212,
+ 'AverageRankGoldLabel@1000': 7.298679867986799,
+ 'MedianRankGoldLabel@1000': 4.0,
+ 'nDCG@3': 0.20433524401045344,
+ 'nDCG@5': 0.23704505274893858,
+ 'nDCG@10': 0.2762912017386188,
+ 'nDCG@20': 0.29887043609675706,
+ 'nDCG@1000': 0.3092384406034222,
+ 'QueriesRanked': 2000,
+ 'MAP@1000': 0.22529540687041122}
+```
+
+FiRA:
+```
+{'MRR@10': 0.9728682170542636,
+ 'Recall@10': 0.17626463120655503,
+ 'QueriesWithNoRelevant@10': 0,
+ 'QueriesWithRelevant@10': 43,
+ 'AverageRankGoldLabel@10': 1.069767441860465,
+ 'MedianRankGoldLabel@10': 1.0,
+ 'MRR@20': 0.9728682170542636,
+ 'Recall@20': 0.2585596782510704,
+ 'QueriesWithNoRelevant@20': 0,
+ 'QueriesWithRelevant@20': 43,
+ 'AverageRankGoldLabel@20': 1.069767441860465,
+ 'MedianRankGoldLabel@20': 1.0,
+ 'MRR@1000': 0.9728682170542636,
+ 'Recall@1000': 0.9541506641086419,
+ 'QueriesWithNoRelevant@1000': 0,
+ 'QueriesWithRelevant@1000': 43,
+ 'AverageRankGoldLabel@1000': 1.069767441860465,
+ 'MedianRankGoldLabel@1000': 1.0,
+ 'nDCG@3': 0.6867852002191022,
+ 'nDCG@5': 0.6881318980167349,
+ 'nDCG@10': 0.6957115295267123,
+ 'nDCG@20': 0.7089894487448578,
+ 'nDCG@1000': 0.8643313057286531,
+ 'QueriesRanked': 43,
+ 'MAP@1000': 0.7948408237588007}
+```
+
+## Conv-KNRM
+
+
+## Results
+
+| Model | Training time in ms/sample | Avg Loss | MS-MARCO MRR@10 | FiRA MRR@10 |
+| --- | --- | --- | --- | --- |
+| MatchPyramid | 1,025 | 0.03 | 0.21 | 0.98 |
+| KNRM | 0.822 | 0.04 | 0.22 | 0.97 |
+
+
+
+[1]: https://github.com/AdeDZY/K-NRM
+[2]: https://www.cs.cmu.edu/~zhuyund/papers/end-end-neural.pdf
